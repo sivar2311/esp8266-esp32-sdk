@@ -39,7 +39,9 @@ class PowerStateController : public SinricProRequestHandler {
     bool sendPowerStateEvent(bool state, String cause = FSTR_SINRICPRO_PHYSICAL_INTERACTION);
 
   private:
-    virtual bool handleRequest(SinricProRequest &request);
+    virtual bool    handleRequest(SinricProRequest &request);
+    inline T       &getDevice();
+    inline const T &getDevice() const;
 
   private:
     EventLimiter       event_limiter;
@@ -49,8 +51,7 @@ class PowerStateController : public SinricProRequestHandler {
 template <typename T>
 PowerStateController<T>::PowerStateController()
     : event_limiter(EVENT_LIMIT_STATE) {
-    T *device = static_cast<T *>(this);
-    device->registerRequestHandler(this);
+    getDevice().registerRequestHandler(this);
 }
 
 /**
@@ -77,27 +78,34 @@ void PowerStateController<T>::onPowerState(PowerStateCallback cb) {
 template <typename T>
 bool PowerStateController<T>::sendPowerStateEvent(bool state, String cause) {
     if (event_limiter) return false;
-    T *device = static_cast<T *>(this);
 
-    DynamicJsonDocument eventMessage   = device->prepareEvent(FSTR_POWERSTATE_setPowerState, cause.c_str());
+    DynamicJsonDocument eventMessage   = getDevice().prepareEvent(FSTR_POWERSTATE_setPowerState, cause.c_str());
     JsonObject          event_value    = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
     event_value[FSTR_POWERSTATE_state] = state ? FSTR_POWERSTATE_On : FSTR_POWERSTATE_Off;
-    return device->sendEvent(eventMessage);
+    return getDevice().sendEvent(eventMessage);
 }
 
 template <typename T>
 bool PowerStateController<T>::handleRequest(SinricProRequest &request) {
-    T *device = static_cast<T *>(this);
-
     bool success = false;
 
     if (request.action == FSTR_POWERSTATE_setPowerState && powerStateCallback) {
         bool powerState                               = request.request_value[FSTR_POWERSTATE_state] == FSTR_POWERSTATE_On ? true : false;
-        success                                       = powerStateCallback(device->deviceId, powerState);
+        success                                       = powerStateCallback(getDevice().deviceId, powerState);
         request.response_value[FSTR_POWERSTATE_state] = powerState ? FSTR_POWERSTATE_On : FSTR_POWERSTATE_Off;
         return success;
     }
     return success;
+}
+
+template <typename T>
+T &PowerStateController<T>::getDevice() {
+    return static_cast<T &>(*this);
+}
+
+template <typename T>
+const T &PowerStateController<T>::getDevice() const {
+    return static_cast<const T &>(*this);
 }
 
 }  // namespace SINRICPRO_NAMESPACE

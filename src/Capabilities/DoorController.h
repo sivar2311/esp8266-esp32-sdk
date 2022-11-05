@@ -40,6 +40,8 @@ class DoorController : public SinricProRequestHandler {
 
   private:
     virtual bool handleRequest(SinricProRequest &request);
+    inline T       &getDevice();
+    inline const T &getDevice() const;
 
   private:
     EventLimiter event_limiter;
@@ -49,8 +51,7 @@ class DoorController : public SinricProRequestHandler {
 template <typename T>
 DoorController<T>::DoorController()
     : event_limiter(EVENT_LIMIT_STATE) {
-    T *device = static_cast<T *>(this);
-    device->registerRequestHandler(this);
+    getDevice().registerRequestHandler(this);
 }
 
 /**
@@ -75,26 +76,33 @@ void DoorController<T>::onDoorState(DoorCallback cb) { doorCallback = cb; }
 template <typename T>
 bool DoorController<T>::sendDoorStateEvent(bool state, String cause) {
     if (event_limiter) return false;
-    T *device = static_cast<T *>(this);
 
-    DynamicJsonDocument eventMessage = device->prepareEvent(FSTR_DOOR_setMode, cause.c_str());
+    DynamicJsonDocument eventMessage = getDevice().prepareEvent(FSTR_DOOR_setMode, cause.c_str());
     JsonObject          event_value  = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
     state ? event_value[FSTR_DOOR_mode] = FSTR_DOOR_Close : event_value[FSTR_DOOR_mode] = FSTR_DOOR_Open;
-    return device->sendEvent(eventMessage);
+    return getDevice().sendEvent(eventMessage);
 }
 
 template <typename T>
 bool DoorController<T>::handleRequest(SinricProRequest &request) {
-    T *device = static_cast<T *>(this);
-
     bool success = false;
     if (request.action == FSTR_DOOR_setMode && doorCallback) {
         String mode                            = request.request_value[FSTR_DOOR_mode] | "";
         bool   state                           = mode == FSTR_DOOR_Close;
-        success                                = doorCallback(device->deviceId, state);
+        success                                = doorCallback(getDevice().deviceId, state);
         request.response_value[FSTR_DOOR_mode] = state ? FSTR_DOOR_Close : FSTR_DOOR_Open;
     }
     return success;
+}
+
+template <typename T>
+T& DoorController<T>::getDevice() {
+    return static_cast<T&>(*this);
+}
+
+template <typename T>
+const T& DoorController<T>::getDevice() const {
+    return static_cast<const T&>(*this);
 }
 
 }  // namespace SINRICPRO_NAMESPACE

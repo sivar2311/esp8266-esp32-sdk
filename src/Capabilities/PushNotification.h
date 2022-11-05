@@ -18,6 +18,11 @@ class PushNotification {
   public:
     PushNotification();
     bool sendPushNotification(String notification);
+
+  private:
+    inline T       &getDevice();
+    inline const T &getDevice() const;
+
   private:
     EventLimiter event_limiter;
 };
@@ -37,14 +42,23 @@ PushNotification<T>::PushNotification()
 template <typename T>
 bool PushNotification<T>::sendPushNotification(String notification) {
   if (event_limiter) return false;
-  T* device = static_cast<T*>(this);
   
-  DynamicJsonDocument eventMessage = device->prepareEvent(FSTR_PUSHNOTIFICATION_pushNotification, FSTR_SINRICPRO_ALERT);
+  DynamicJsonDocument eventMessage = getDevice().prepareEvent(FSTR_PUSHNOTIFICATION_pushNotification, FSTR_SINRICPRO_ALERT);
   JsonObject event_value = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
 
   event_value[FSTR_PUSHNOTIFICATION_alert] = notification;
 
-  return device->sendEvent(eventMessage);
+  return getDevice().sendEvent(eventMessage);
+}
+
+template <typename T>
+T& PushNotification<T>::getDevice() {
+    return static_cast<T&>(*this);
+}
+
+template <typename T>
+const T& PushNotification<T>::getDevice() const {
+    return static_cast<const T&>(*this);
 }
 
 } // SINRICPRO_NAMESPACE

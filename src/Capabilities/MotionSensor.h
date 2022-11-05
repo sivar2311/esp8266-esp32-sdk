@@ -20,6 +20,11 @@ class MotionSensor {
   public:
     MotionSensor();
     bool sendMotionEvent(bool detected, String cause = FSTR_SINRICPRO_PHYSICAL_INTERACTION);
+
+  private:
+    inline T       &getDevice();
+    inline const T &getDevice() const;
+
   private:
     EventLimiter event_limiter;
 };
@@ -40,12 +45,21 @@ MotionSensor<T>::MotionSensor()
 template <typename T>
 bool MotionSensor<T>::sendMotionEvent(bool detected, String cause) {
   if (event_limiter) return false;
-  T* device = static_cast<T*>(this);
 
-  DynamicJsonDocument eventMessage = device->prepareEvent(FSTR_MOTION_motion, cause.c_str());
+  DynamicJsonDocument eventMessage = getDevice().prepareEvent(FSTR_MOTION_motion, cause.c_str());
   JsonObject event_value = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
   event_value[FSTR_MOTION_state] = detected ? FSTR_MOTION_detected : FSTR_MOTION_notDetected;
-  return device->sendEvent(eventMessage);
+  return getDevice().sendEvent(eventMessage);
+}
+
+template <typename T>
+T& MotionSensor<T>::getDevice() {
+    return static_cast<T&>(*this);
+}
+
+template <typename T>
+const T& MotionSensor<T>::getDevice() const {
+    return static_cast<const T&>(*this);
 }
 
 } // SINRICPRO_NAMESPACE

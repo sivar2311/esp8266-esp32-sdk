@@ -56,7 +56,9 @@ class BrightnessController : public SinricProRequestHandler {
     bool sendBrightnessEvent(int brightness, String cause = FSTR_SINRICPRO_PHYSICAL_INTERACTION);
 
   private:
-    virtual bool handleRequest(SinricProRequest &request);
+    virtual bool    handleRequest(SinricProRequest &request);
+    inline T       &getDevice();
+    inline const T &getDevice() const;
 
   private:
     EventLimiter             event_limiter;
@@ -67,8 +69,7 @@ class BrightnessController : public SinricProRequestHandler {
 template <typename T>
 BrightnessController<T>::BrightnessController()
     : event_limiter(EVENT_LIMIT_STATE) {
-    T *device = static_cast<T *>(this);
-    device->registerRequestHandler(this);
+    getDevice().registerRequestHandler(this);
 }
 
 /**
@@ -107,32 +108,40 @@ void BrightnessController<T>::onAdjustBrightness(AdjustBrightnessCallback cb) {
 template <typename T>
 bool BrightnessController<T>::sendBrightnessEvent(int brightness, String cause) {
     if (event_limiter) return false;
-    T *device = static_cast<T *>(this);
 
-    DynamicJsonDocument eventMessage        = device->prepareEvent(FSTR_BRIGHTNESS_setBrightness, cause.c_str());
+    DynamicJsonDocument eventMessage        = getDevice().prepareEvent(FSTR_BRIGHTNESS_setBrightness, cause.c_str());
     JsonObject          event_value         = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
     event_value[FSTR_BRIGHTNESS_brightness] = brightness;
-    return device->sendEvent(eventMessage);
+    return getDevice().sendEvent(eventMessage);
 }
 
 template <typename T>
 bool BrightnessController<T>::handleRequest(SinricProRequest &request) {
-    T   *device  = static_cast<T *>(this);
     bool success = false;
 
     if (brightnessCallback && request.action == FSTR_BRIGHTNESS_setBrightness) {
         int brightness                                     = request.request_value[FSTR_BRIGHTNESS_brightness];
-        success                                            = brightnessCallback(device->deviceId, brightness);
+        success                                            = brightnessCallback(getDevice().deviceId, brightness);
         request.response_value[FSTR_BRIGHTNESS_brightness] = brightness;
     }
 
     if (adjustBrightnessCallback && request.action == FSTR_BRIGHTNESS_adjustBrightness) {
         int brightnessDelta                                = request.request_value[FSTR_BRIGHTNESS_brightnessDelta];
-        success                                            = adjustBrightnessCallback(device->deviceId, brightnessDelta);
+        success                                            = adjustBrightnessCallback(getDevice().deviceId, brightnessDelta);
         request.response_value[FSTR_BRIGHTNESS_brightness] = brightnessDelta;
     }
 
     return success;
+}
+
+template <typename T>
+T& BrightnessController<T>::getDevice() {
+    return static_cast<T&>(*this);
+}
+
+template <typename T>
+const T& BrightnessController<T>::getDevice() const {
+    return static_cast<const T&>(*this);
 }
 
 }  // namespace SINRICPRO_NAMESPACE

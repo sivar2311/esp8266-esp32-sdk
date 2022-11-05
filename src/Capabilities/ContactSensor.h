@@ -21,6 +21,10 @@ class ContactSensor {
     ContactSensor();
     bool sendContactEvent(bool detected, String cause = FSTR_SINRICPRO_PHYSICAL_INTERACTION);
   private:
+    inline T       &getDevice();
+    inline const T &getDevice() const;
+
+  private:
     EventLimiter event_limiter;
 };
 
@@ -39,12 +43,21 @@ ContactSensor<T>::ContactSensor()
 template <typename T>
 bool ContactSensor<T>::sendContactEvent(bool detected, String cause) {
   if (event_limiter) return false;
-  T* device = static_cast<T*>(this);
-  
-  DynamicJsonDocument eventMessage = device->prepareEvent(FSTR_CONTACT_setContactState, cause.c_str());
+ 
+  DynamicJsonDocument eventMessage = getDevice().prepareEvent(FSTR_CONTACT_setContactState, cause.c_str());
   JsonObject event_value = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
   event_value[FSTR_CONTACT_state] = detected ? FSTR_CONTACT_closed : FSTR_CONTACT_open;
-  return device->sendEvent(eventMessage);
+  return getDevice().sendEvent(eventMessage);
+}
+
+template <typename T>
+T &ContactSensor<T>::getDevice() {
+    return static_cast<T &>(*this);
+}
+
+template <typename T>
+const T &ContactSensor<T>::getDevice() const {
+    return static_cast<const T &>(*this);
 }
 
 } // SINRICPRO_NAMESPACE

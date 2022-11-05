@@ -59,7 +59,9 @@ class VolumeController : public SinricProRequestHandler {
     bool sendVolumeEvent(int volume, String cause = FSTR_SINRICPRO_PHYSICAL_INTERACTION);
 
   private:
-    virtual bool handleRequest(SinricProRequest &request);
+    virtual bool    handleRequest(SinricProRequest &request);
+    inline T       &getDevice();
+    inline const T &getDevice() const;
 
   private:
     EventLimiter         event_limiter;
@@ -70,8 +72,7 @@ class VolumeController : public SinricProRequestHandler {
 template <typename T>
 VolumeController<T>::VolumeController()
     : event_limiter(EVENT_LIMIT_STATE) {
-    T *device = static_cast<T *>(this);
-    device->registerRequestHandler(this);
+    getDevice().registerRequestHandler(this);
 }
 
 /**
@@ -106,23 +107,20 @@ void VolumeController<T>::onAdjustVolume(AdjustVolumeCallback cb) { adjustVolume
 template <typename T>
 bool VolumeController<T>::sendVolumeEvent(int volume, String cause) {
     if (event_limiter) return false;
-    T *device = static_cast<T *>(this);
 
-    DynamicJsonDocument eventMessage = device->prepareEvent(FSTR_VOLUME_setVolume, cause.c_str());
+    DynamicJsonDocument eventMessage = getDevice().prepareEvent(FSTR_VOLUME_setVolume, cause.c_str());
     JsonObject          event_value  = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
     event_value[FSTR_VOLUME_volume]  = volume;
-    return device->sendEvent(eventMessage);
+    return getDevice().sendEvent(eventMessage);
 }
 
 template <typename T>
 bool VolumeController<T>::handleRequest(SinricProRequest &request) {
-    T *device = static_cast<T *>(this);
-
     bool success = false;
 
     if (volumeCallback && request.action == FSTR_VOLUME_setVolume) {
         int volume                                 = request.request_value[FSTR_VOLUME_volume];
-        success                                    = volumeCallback(device->deviceId, volume);
+        success                                    = volumeCallback(getDevice().deviceId, volume);
         request.response_value[FSTR_VOLUME_volume] = volume;
         return success;
     }
@@ -130,11 +128,21 @@ bool VolumeController<T>::handleRequest(SinricProRequest &request) {
     if (adjustVolumeCallback && request.action == FSTR_VOLUME_adjustVolume) {
         int  volume                                = request.request_value[FSTR_VOLUME_volume];
         bool volumeDefault                         = request.request_value[FSTR_VOLUME_volumeDefault] | false;
-        success                                    = adjustVolumeCallback(device->deviceId, volume, volumeDefault);
+        success                                    = adjustVolumeCallback(getDevice().deviceId, volume, volumeDefault);
         request.response_value[FSTR_VOLUME_volume] = volume;
         return success;
     }
     return success;
+}
+
+template <typename T>
+T& VolumeController<T>::getDevice() {
+    return static_cast<T&>(*this);
+}
+
+template <typename T>
+const T& VolumeController<T>::getDevice() const {
+    return static_cast<const T&>(*this);
 }
 
 }  // namespace SINRICPRO_NAMESPACE

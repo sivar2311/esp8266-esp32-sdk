@@ -77,7 +77,9 @@ class ThermostatController : public SinricProRequestHandler {
     bool sendTargetTemperatureEvent(float temperature, String cause = FSTR_SINRICPRO_PHYSICAL_INTERACTION);
 
   private:
-    virtual bool handleRequest(SinricProRequest &request);
+    virtual bool    handleRequest(SinricProRequest &request);
+    inline T       &getDevice();
+    inline const T &getDevice() const;
 
   private:
     EventLimiter                    event_limiter_thermostatMode;
@@ -91,8 +93,7 @@ template <typename T>
 ThermostatController<T>::ThermostatController()
     : event_limiter_thermostatMode(EVENT_LIMIT_STATE)
     , event_limiter_targetTemperature(EVENT_LIMIT_STATE) {
-    T *device = static_cast<T *>(this);
-    device->registerRequestHandler(this);
+    getDevice().registerRequestHandler(this);
 }
 
 /**
@@ -143,12 +144,11 @@ void ThermostatController<T>::onAdjustTargetTemperature(AdjustTargetTemperatureC
 template <typename T>
 bool ThermostatController<T>::sendThermostatModeEvent(String thermostatMode, String cause) {
     if (event_limiter_thermostatMode) return false;
-    T *device = static_cast<T *>(this);
 
-    DynamicJsonDocument eventMessage            = device->prepareEvent(FSTR_THERMOSTAT_setThermostatMode, cause.c_str());
+    DynamicJsonDocument eventMessage            = getDevice().prepareEvent(FSTR_THERMOSTAT_setThermostatMode, cause.c_str());
     JsonObject          event_value             = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
     event_value[FSTR_THERMOSTAT_thermostatMode] = thermostatMode;
-    return device->sendEvent(eventMessage);
+    return getDevice().sendEvent(eventMessage);
 }
 
 /**
@@ -163,18 +163,15 @@ bool ThermostatController<T>::sendThermostatModeEvent(String thermostatMode, Str
 template <typename T>
 bool ThermostatController<T>::sendTargetTemperatureEvent(float temperature, String cause) {
     if (event_limiter_targetTemperature) return false;
-    T *device = static_cast<T *>(this);
 
-    DynamicJsonDocument eventMessage         = device->prepareEvent(FSTR_THERMOSTAT_targetTemperature, cause.c_str());
+    DynamicJsonDocument eventMessage         = getDevice().prepareEvent(FSTR_THERMOSTAT_targetTemperature, cause.c_str());
     JsonObject          event_value          = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
     event_value[FSTR_THERMOSTAT_temperature] = roundf(temperature * 10) / 10.0;
-    return device->sendEvent(eventMessage);
+    return getDevice().sendEvent(eventMessage);
 }
 
 template <typename T>
 bool ThermostatController<T>::handleRequest(SinricProRequest &request) {
-    T *device = static_cast<T *>(this);
-
     bool success = false;
 
     if (request.action == FSTR_THERMOSTAT_targetTemperature && targetTemperatureCallback) {
@@ -184,26 +181,36 @@ bool ThermostatController<T>::handleRequest(SinricProRequest &request) {
         } else {
             temperature = 1;
         }
-        success                                             = targetTemperatureCallback(device->deviceId, temperature);
+        success                                             = targetTemperatureCallback(getDevice().deviceId, temperature);
         request.response_value[FSTR_THERMOSTAT_temperature] = temperature;
         return success;
     }
 
     if (request.action == FSTR_THERMOSTAT_adjustTargetTemperature && adjustTargetTemperatureCallback) {
         float temperatureDelta                              = request.request_value[FSTR_THERMOSTAT_temperature];
-        success                                             = adjustTargetTemperatureCallback(device->deviceId, temperatureDelta);
+        success                                             = adjustTargetTemperatureCallback(getDevice().deviceId, temperatureDelta);
         request.response_value[FSTR_THERMOSTAT_temperature] = temperatureDelta;
         return success;
     }
 
     if (request.action == FSTR_THERMOSTAT_setThermostatMode && thermostatModeCallback) {
         String thermostatMode                                  = request.request_value[FSTR_THERMOSTAT_thermostatMode] | "";
-        success                                                = thermostatModeCallback(device->deviceId, thermostatMode);
+        success                                                = thermostatModeCallback(getDevice().deviceId, thermostatMode);
         request.response_value[FSTR_THERMOSTAT_thermostatMode] = thermostatMode;
         return success;
     }
 
     return success;
+}
+
+template <typename T>
+T &ThermostatController<T>::getDevice() {
+    return static_cast<T &>(*this);
+}
+
+template <typename T>
+const T &ThermostatController<T>::getDevice() const {
+    return static_cast<const T &>(*this);
 }
 
 }  // namespace SINRICPRO_NAMESPACE

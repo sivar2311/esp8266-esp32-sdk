@@ -39,6 +39,8 @@ class InputController : public SinricProRequestHandler {
 
   private:
     virtual bool handleRequest(SinricProRequest &request);
+    inline T       &getDevice();
+    inline const T &getDevice() const;
 
   private:
     EventLimiter        event_limiter;
@@ -48,8 +50,7 @@ class InputController : public SinricProRequestHandler {
 template <typename T>
 InputController<T>::InputController()
     : event_limiter(EVENT_LIMIT_STATE) {
-    T *device = static_cast<T *>(this);
-    device->registerRequestHandler(this);
+    getDevice().registerRequestHandler(this);
 }
 
 /**
@@ -76,28 +77,35 @@ void InputController<T>::onSelectInput(SelectInputCallback cb) {
 template <typename T>
 bool InputController<T>::sendSelectInputEvent(String input, String cause) {
     if (event_limiter) return false;
-    T *device = static_cast<T *>(this);
 
-    DynamicJsonDocument eventMessage = device->prepareEvent(FSTR_INPUT_selectInput, cause.c_str());
+    DynamicJsonDocument eventMessage = getDevice().prepareEvent(FSTR_INPUT_selectInput, cause.c_str());
     JsonObject          event_value  = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
     event_value[FSTR_INPUT_input]    = input;
-    return device->sendEvent(eventMessage);
+    return getDevice().sendEvent(eventMessage);
 }
 
 template <typename T>
 bool InputController<T>::handleRequest(SinricProRequest &request) {
-    T *device = static_cast<T *>(this);
-
     bool success = false;
 
     if (selectInputCallback && request.action == FSTR_INPUT_selectInput) {
         String input                             = request.request_value[FSTR_INPUT_input];
-        success                                  = selectInputCallback(device->deviceId, input);
+        success                                  = selectInputCallback(getDevice().deviceId, input);
         request.response_value[FSTR_INPUT_input] = input;
         return success;
     }
 
     return success;
+}
+
+template <typename T>
+T& InputController<T>::getDevice() {
+    return static_cast<T&>(*this);
+}
+
+template <typename T>
+const T& InputController<T>::getDevice() const {
+    return static_cast<const T&>(*this);
 }
 
 }  // namespace SINRICPRO_NAMESPACE

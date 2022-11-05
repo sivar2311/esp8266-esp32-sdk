@@ -36,7 +36,9 @@ class KeypadController : public SinricProRequestHandler {
     void onKeystroke(KeystrokeCallback cb);
 
   private:
-    virtual bool handleRequest(SinricProRequest &request);
+    virtual bool    handleRequest(SinricProRequest &request);
+    inline T       &getDevice();
+    inline const T &getDevice() const;
 
   private:
     KeystrokeCallback keystrokeCallback;
@@ -44,8 +46,7 @@ class KeypadController : public SinricProRequestHandler {
 
 template <typename T>
 KeypadController<T>::KeypadController() {
-    T *device = static_cast<T *>(this);
-    device->registerRequestHandler(this);
+    getDevice().registerRequestHandler(this);
 }
 
 /**
@@ -60,19 +61,27 @@ void KeypadController<T>::onKeystroke(KeystrokeCallback cb) { keystrokeCallback 
 
 template <typename T>
 bool KeypadController<T>::handleRequest(SinricProRequest &request) {
-    T *device = static_cast<T *>(this);
-
     bool success = false;
     if (request.action != FSTR_KEYPAD_sendKeystroke) return false;
 
     if (keystrokeCallback) {
         String keystroke                              = request.request_value[FSTR_KEYPAD_keystroke] | "";
-        success                                       = keystrokeCallback(device->deviceId, keystroke);
+        success                                       = keystrokeCallback(getDevice().deviceId, keystroke);
         request.response_value[FSTR_KEYPAD_keystroke] = keystroke;
         return success;
     }
 
     return success;
+}
+
+template <typename T>
+T& KeypadController<T>::getDevice() {
+    return static_cast<T &>(*this);
+}
+
+template <typename T>
+const T& KeypadController<T>::getDevice() const {
+    return static_cast<const T &>(*this);
 }
 
 }  // namespace SINRICPRO_NAMESPACE

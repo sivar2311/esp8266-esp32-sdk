@@ -123,7 +123,9 @@ class RangeController : public SinricProRequestHandler {
     bool sendRangeValueEvent(const String& instance, float rangeValue, String cause = FSTR_SINRICPRO_PHYSICAL_INTERACTION);
 
   private:
-    virtual bool handleRequest(SinricProRequest& request);
+    virtual bool    handleRequest(SinricProRequest& request);
+    inline T&       getDevice();
+    inline const T& getDevice() const;
 
   private:
     EventLimiter                                event_limiter;
@@ -137,8 +139,7 @@ class RangeController : public SinricProRequestHandler {
 template <typename T>
 RangeController<T>::RangeController()
     : event_limiter(EVENT_LIMIT_STATE) {
-    T* device = static_cast<T*>(this);
-    device->registerRequestHandler(this);
+    getDevice().registerRequestHandler(this);
 }
 
 /**
@@ -202,12 +203,11 @@ void RangeController<T>::onAdjustRangeValue(const String& instance, GenericAdjus
 template <typename T>
 bool RangeController<T>::sendRangeValueEvent(int rangeValue, String cause) {
     if (event_limiter) return false;
-    T* device = static_cast<T*>(this);
 
-    DynamicJsonDocument eventMessage   = device->prepareEvent(FSTR_RANGE_setRangeValue, cause.c_str());
+    DynamicJsonDocument eventMessage   = getDevice().prepareEvent(FSTR_RANGE_setRangeValue, cause.c_str());
     JsonObject          event_value    = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
     event_value[FSTR_RANGE_rangeValue] = rangeValue;
-    return device->sendEvent(eventMessage);
+    return getDevice().sendEvent(eventMessage);
 }
 
 /**
@@ -224,40 +224,36 @@ template <typename T>
 bool RangeController<T>::sendRangeValueEvent(const String& instance, int rangeValue, String cause) {
     if (event_limiter_generic.find(instance) == event_limiter_generic.end()) event_limiter_generic[instance] = EventLimiter(EVENT_LIMIT_STATE);
     if (event_limiter_generic[instance]) return false;
-    T* device = static_cast<T*>(this);
 
-    DynamicJsonDocument eventMessage                                = device->prepareEvent(FSTR_RANGE_setRangeValue, cause.c_str());
+    DynamicJsonDocument eventMessage                                = getDevice().prepareEvent(FSTR_RANGE_setRangeValue, cause.c_str());
     eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_instanceId] = instance;
 
     JsonObject event_value             = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
     event_value[FSTR_RANGE_rangeValue] = rangeValue;
-    return device->sendEvent(eventMessage);
+    return getDevice().sendEvent(eventMessage);
 }
 
 template <typename T>
 bool RangeController<T>::sendRangeValueEvent(const String& instance, float rangeValue, String cause) {
     if (event_limiter_generic.find(instance) == event_limiter_generic.end()) event_limiter_generic[instance] = EventLimiter(EVENT_LIMIT_STATE);
     if (event_limiter_generic[instance]) return false;
-    T* device = static_cast<T*>(this);
 
-    DynamicJsonDocument eventMessage                                = device->prepareEvent(FSTR_RANGE_setRangeValue, cause.c_str());
+    DynamicJsonDocument eventMessage                                = getDevice().prepareEvent(FSTR_RANGE_setRangeValue, cause.c_str());
     eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_instanceId] = instance;
 
     JsonObject event_value             = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
     event_value[FSTR_RANGE_rangeValue] = rangeValue;
-    return device->sendEvent(eventMessage);
+    return getDevice().sendEvent(eventMessage);
 }
 
 template <typename T>
 bool RangeController<T>::handleRequest(SinricProRequest& request) {
-    T* device = static_cast<T*>(this);
-
     bool success = false;
 
     if (request.action == FSTR_RANGE_setRangeValue) {
         if (request.instance == "") {
             int rangeValue = request.request_value[FSTR_RANGE_rangeValue];
-            if (setRangeValueCallback) success = setRangeValueCallback(device->deviceId, rangeValue);
+            if (setRangeValueCallback) success = setRangeValueCallback(getDevice().deviceId, rangeValue);
             request.response_value[FSTR_RANGE_rangeValue] = rangeValue;
             return success;
 
@@ -268,14 +264,14 @@ bool RangeController<T>::handleRequest(SinricProRequest& request) {
 
             if (cb.type == GenericRangeValueCallback::type_float) {
                 float value                                   = request.request_value[FSTR_RANGE_rangeValue];
-                success                                       = cb.cb_float(device->deviceId, request.instance, value);
+                success                                       = cb.cb_float(getDevice().deviceId, request.instance, value);
                 request.response_value[FSTR_RANGE_rangeValue] = value;
                 return success;
             }
 
             if (cb.type == GenericRangeValueCallback::type_int) {
                 int value                                     = request.request_value[FSTR_RANGE_rangeValue];
-                success                                       = cb.cb_int(device->deviceId, request.instance, value);
+                success                                       = cb.cb_int(getDevice().deviceId, request.instance, value);
                 request.response_value[FSTR_RANGE_rangeValue] = value;
                 return success;
             }
@@ -285,7 +281,7 @@ bool RangeController<T>::handleRequest(SinricProRequest& request) {
     if (request.action == FSTR_RANGE_adjustRangeValue) {
         if (request.instance == "") {
             int rangeValue = request.request_value[FSTR_RANGE_rangeValueDelta];
-            if (adjustRangeValueCallback) success = adjustRangeValueCallback(device->deviceId, rangeValue);
+            if (adjustRangeValueCallback) success = adjustRangeValueCallback(getDevice().deviceId, rangeValue);
             request.response_value[FSTR_RANGE_rangeValue] = rangeValue;
             return success;
 
@@ -296,14 +292,14 @@ bool RangeController<T>::handleRequest(SinricProRequest& request) {
 
             if (cb.type == GenericRangeValueCallback::type_float) {
                 float value                                   = request.request_value[FSTR_RANGE_rangeValueDelta];
-                success                                       = cb.cb_float(device->deviceId, request.instance, value);
+                success                                       = cb.cb_float(getDevice().deviceId, request.instance, value);
                 request.response_value[FSTR_RANGE_rangeValue] = value;
                 return success;
             }
 
             if (cb.type == GenericRangeValueCallback::type_int) {
                 int value                                     = request.request_value[FSTR_RANGE_rangeValueDelta];
-                success                                       = cb.cb_int(device->deviceId, request.instance, value);
+                success                                       = cb.cb_int(getDevice().deviceId, request.instance, value);
                 request.response_value[FSTR_RANGE_rangeValue] = value;
                 return success;
             }
@@ -311,6 +307,16 @@ bool RangeController<T>::handleRequest(SinricProRequest& request) {
     }
 
     return false;
+}
+
+template <typename T>
+T& RangeController<T>::getDevice() {
+    return static_cast<T&>(*this);
+}
+
+template <typename T>
+const T& RangeController<T>::getDevice() const {
+    return static_cast<const T&>(*this);
 }
 
 }  // namespace SINRICPRO_NAMESPACE

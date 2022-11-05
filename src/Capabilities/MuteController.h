@@ -39,6 +39,8 @@ class MuteController : public SinricProRequestHandler {
 
   private:
     virtual bool handleRequest(SinricProRequest &request);
+    inline T       &getDevice();
+    inline const T &getDevice() const;
 
   private:
     EventLimiter event_limiter;
@@ -48,8 +50,7 @@ class MuteController : public SinricProRequestHandler {
 template <typename T>
 MuteController<T>::MuteController()
     : event_limiter(EVENT_LIMIT_STATE) {
-    T *device = static_cast<T *>(this);
-    device->registerRequestHandler(this);
+    getDevice().registerRequestHandler(this);
 }
 
 /**
@@ -74,27 +75,34 @@ void MuteController<T>::onMute(MuteCallback cb) { muteCallback = cb; }
 template <typename T>
 bool MuteController<T>::sendMuteEvent(bool mute, String cause) {
     if (event_limiter) return false;
-    T *device = static_cast<T *>(this);
 
-    DynamicJsonDocument eventMessage = device->prepareEvent(FSTR_MUTE_setMute, cause.c_str());
+    DynamicJsonDocument eventMessage = getDevice().prepareEvent(FSTR_MUTE_setMute, cause.c_str());
     JsonObject          event_value  = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
     event_value[FSTR_MUTE_mute]      = mute;
-    return device->sendEvent(eventMessage);
+    return getDevice().sendEvent(eventMessage);
 }
 
 template <typename T>
 bool MuteController<T>::handleRequest(SinricProRequest &request) {
-    T *device = static_cast<T *>(this);
-
     bool success = false;
 
     if (muteCallback && request.action == FSTR_MUTE_setMute) {
         bool mute                              = request.request_value[FSTR_MUTE_mute];
-        success                                = muteCallback(device->deviceId, mute);
+        success                                = muteCallback(getDevice().deviceId, mute);
         request.response_value[FSTR_MUTE_mute] = mute;
         return success;
     }
     return success;
+}
+
+template <typename T>
+T& MuteController<T>::getDevice() {
+    return static_cast<T&>(*this);
+}
+
+template <typename T>
+const T& MuteController<T>::getDevice() const {
+    return static_cast<const T&>(*this);
 }
 
 }  // namespace SINRICPRO_NAMESPACE

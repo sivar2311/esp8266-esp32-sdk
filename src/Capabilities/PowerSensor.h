@@ -27,6 +27,10 @@ public:
   bool sendPowerSensorEvent(float voltage, float current, float power = -1.0f, float apparentPower = -1.0f, float reactivePower = -1.0f, float factor = -1.0f, String cause = FSTR_SINRICPRO_PERIODIC_POLL);
 
 private:
+    inline T       &getDevice();
+    inline const T &getDevice() const;
+
+private:
   EventLimiter event_limiter;
   unsigned long startTime = 0;
   unsigned long lastPower = 0;
@@ -53,16 +57,15 @@ PowerSensor<T>::PowerSensor()
 template <typename T>
 bool PowerSensor<T>::sendPowerSensorEvent(float voltage, float current, float power, float apparentPower, float reactivePower, float factor, String cause) {
   if (event_limiter) return false;
-  T* device = static_cast<T*>(this);
 
-  DynamicJsonDocument eventMessage = device->prepareEvent(FSTR_POWERSENSOR_powerUsage, cause.c_str());
+  DynamicJsonDocument eventMessage = getDevice().prepareEvent(FSTR_POWERSENSOR_powerUsage, cause.c_str());
   JsonObject event_value = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
   if (power == -1)
     power = voltage * current;
   if (apparentPower != -1)
     factor = power / apparentPower;
 
-  unsigned long currentTimestamp = device->getTimestamp();
+  unsigned long currentTimestamp = getDevice().getTimestamp();
 
   event_value[FSTR_POWERSENSOR_startTime]     = startTime;
   event_value[FSTR_POWERSENSOR_voltage]       = voltage;
@@ -75,7 +78,7 @@ bool PowerSensor<T>::sendPowerSensorEvent(float voltage, float current, float po
 
   startTime = currentTimestamp;
   lastPower = power;
-  return device->sendEvent(eventMessage);
+  return getDevice().sendEvent(eventMessage);
 }
 
 template <typename T>
@@ -83,6 +86,16 @@ float PowerSensor<T>::getWattHours(unsigned long currentTimestamp) {
   if (startTime)
     return (currentTimestamp - startTime) * lastPower / 3600.0f;
   return 0;
+}
+
+template <typename T>
+T& PowerSensor<T>::getDevice() {
+    return static_cast<T&>(*this);
+}
+
+template <typename T>
+const T& PowerSensor<T>::getDevice() const {
+    return static_cast<const T&>(*this);
 }
 
 } // SINRICPRO_NAMESPACE

@@ -39,6 +39,8 @@ class MediaController : public SinricProRequestHandler {
 
   private:
     virtual bool handleRequest(SinricProRequest &request);
+    inline T       &getDevice();
+    inline const T &getDevice() const;
 
   private:
     EventLimiter         event_limiter;
@@ -48,8 +50,7 @@ class MediaController : public SinricProRequestHandler {
 template <typename T>
 MediaController<T>::MediaController()
     : event_limiter(EVENT_LIMIT_STATE) {
-    T *device = static_cast<T *>(this);
-    device->registerRequestHandler(this);
+    getDevice().registerRequestHandler(this);
 }
 
 /**
@@ -76,28 +77,35 @@ void MediaController<T>::onMediaControl(MediaControlCallback cb) {
 template <typename T>
 bool MediaController<T>::sendMediaControlEvent(String mediaControl, String cause) {
     if (event_limiter) return false;
-    T *device = static_cast<T *>(this);
 
-    DynamicJsonDocument eventMessage = device->prepareEvent(FSTR_MEDIA_mediaControl, cause.c_str());
+    DynamicJsonDocument eventMessage = getDevice().prepareEvent(FSTR_MEDIA_mediaControl, cause.c_str());
     JsonObject          event_value  = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
     event_value[FSTR_MEDIA_control]  = mediaControl;
-    return device->sendEvent(eventMessage);
+    return getDevice().sendEvent(eventMessage);
 }
 
 template <typename T>
 bool MediaController<T>::handleRequest(SinricProRequest &request) {
-    T *device = static_cast<T *>(this);
-
     bool success = false;
 
     if (mediaControlCallback && request.action == FSTR_MEDIA_mediaControl) {
         String mediaControl                        = request.request_value[FSTR_MEDIA_control];
-        success                                    = mediaControlCallback(device->deviceId, mediaControl);
+        success                                    = mediaControlCallback(getDevice().deviceId, mediaControl);
         request.response_value[FSTR_MEDIA_control] = mediaControl;
         return success;
     }
 
     return success;
+}
+
+template <typename T>
+T& MediaController<T>::getDevice() {
+    return static_cast<T&>(*this);
+}
+
+template <typename T>
+const T& MediaController<T>::getDevice() const {
+    return static_cast<const T&>(*this);
 }
 
 }  // namespace SINRICPRO_NAMESPACE

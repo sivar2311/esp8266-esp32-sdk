@@ -1,14 +1,13 @@
 #pragma once
 
 #include "../EventLimiter.h"
-#include "../SinricProStrings.h"
-
 #include "../SinricProNamespace.h"
+#include "../SinricProStrings.h"
 namespace SINRICPRO_NAMESPACE {
 
-FSTR(TEMPERATURE, currentTemperature);    // "currentTemperature"
-FSTR(TEMPERATURE, humidity);              // "humidity"
-FSTR(TEMPERATURE, temperature);           // "temperature"
+FSTR(TEMPERATURE, currentTemperature);  // "currentTemperature"
+FSTR(TEMPERATURE, humidity);            // "humidity"
+FSTR(TEMPERATURE, temperature);         // "temperature"
 
 /**
  * @brief TemperatureSensor
@@ -19,17 +18,22 @@ class TemperatureSensor {
   public:
     TemperatureSensor();
     bool sendTemperatureEvent(float temperature, float humidity = -1, String cause = FSTR_SINRICPRO_PERIODIC_POLL);
+
+  private:
+    inline T&       getDevice();
+    inline const T& getDevice() const;
+
   private:
     EventLimiter event_limiter;
 };
 
 template <typename T>
-TemperatureSensor<T>::TemperatureSensor() 
-: event_limiter(EVENT_LIMIT_SENSOR_VALUE) {}
+TemperatureSensor<T>::TemperatureSensor()
+    : event_limiter(EVENT_LIMIT_SENSOR_VALUE) {}
 
 /**
  * @brief Send `currentTemperature` event to report actual temperature (measured by a sensor)
- * 
+ *
  * @param   temperature   `float` actual temperature measured by a sensor
  * @param   humidity      `float` (optional) actual humidity measured by a sensor (default=-1.0f means not supported)
  * @param   cause         (optional) `String` reason why event is sent (default = `"PERIODIC_POLL"`)
@@ -39,17 +43,26 @@ TemperatureSensor<T>::TemperatureSensor()
  **/
 template <typename T>
 bool TemperatureSensor<T>::sendTemperatureEvent(float temperature, float humidity, String cause) {
-  if (event_limiter) return false;
-  T* device = static_cast<T*>(this);
+    if (event_limiter) return false;
 
-  DynamicJsonDocument eventMessage = device->prepareEvent(FSTR_TEMPERATURE_currentTemperature, cause.c_str());
-  JsonObject event_value = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
-  event_value[FSTR_TEMPERATURE_humidity] = roundf(humidity * 100) / 100.0;
-  event_value[FSTR_TEMPERATURE_temperature] = roundf(temperature * 10) / 10.0;
-  return device->sendEvent(eventMessage);
+    DynamicJsonDocument eventMessage          = getDevice().prepareEvent(FSTR_TEMPERATURE_currentTemperature, cause.c_str());
+    JsonObject          event_value           = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
+    event_value[FSTR_TEMPERATURE_humidity]    = roundf(humidity * 100) / 100.0;
+    event_value[FSTR_TEMPERATURE_temperature] = roundf(temperature * 10) / 10.0;
+    return getDevice().sendEvent(eventMessage);
 }
 
-} // SINRICPRO_NAMESPACE
+template <typename T>
+T& TemperatureSensor<T>::getDevice() {
+    return static_cast<T&>(*this);
+}
+
+template <typename T>
+const T& TemperatureSensor<T>::getDevice() const {
+    return static_cast<const T&>(*this);
+}
+
+}  // namespace SINRICPRO_NAMESPACE
 
 template <typename T>
 using TemperatureSensor = SINRICPRO_NAMESPACE::TemperatureSensor<T>;

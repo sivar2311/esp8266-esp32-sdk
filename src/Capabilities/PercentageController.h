@@ -57,7 +57,9 @@ class PercentageController : public SinricProRequestHandler {
     bool sendSetPercentageEvent(int percentage, String cause = FSTR_SINRICPRO_PHYSICAL_INTERACTION);
 
   private:
-    virtual bool handleRequest(SinricProRequest &request);
+    virtual bool    handleRequest(SinricProRequest &request);
+    inline T       &getDevice();
+    inline const T &getDevice() const;
 
   private:
     EventLimiter             event_limiter;
@@ -68,8 +70,7 @@ class PercentageController : public SinricProRequestHandler {
 template <typename T>
 PercentageController<T>::PercentageController()
     : event_limiter(EVENT_LIMIT_STATE) {
-    T *device = static_cast<T *>(this);
-    device->registerRequestHandler(this);
+    getDevice().registerRequestHandler(this);
 }
 
 /**
@@ -104,34 +105,42 @@ void PercentageController<T>::onAdjustPercentage(AdjustPercentageCallback cb) { 
 template <typename T>
 bool PercentageController<T>::sendSetPercentageEvent(int percentage, String cause) {
     if (event_limiter) return false;
-    T *device = static_cast<T *>(this);
 
-    DynamicJsonDocument eventMessage        = device->prepareEvent(FSTR_PERCENTAGE_setPercentage, cause.c_str());
+    DynamicJsonDocument eventMessage        = getDevice().prepareEvent(FSTR_PERCENTAGE_setPercentage, cause.c_str());
     JsonObject          event_value         = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
     event_value[FSTR_PERCENTAGE_percentage] = percentage;
-    return device->sendEvent(eventMessage);
+    return getDevice().sendEvent(eventMessage);
 }
 
 template <typename T>
 bool PercentageController<T>::handleRequest(SinricProRequest &request) {
-    T *device = static_cast<T *>(this);
 
     bool success = false;
 
     if (percentageCallback && request.action == FSTR_PERCENTAGE_setPercentage) {
         int percentage                                     = request.request_value[FSTR_PERCENTAGE_percentage];
-        success                                            = percentageCallback(device->deviceId, percentage);
+        success                                            = percentageCallback(getDevice().deviceId, percentage);
         request.response_value[FSTR_PERCENTAGE_percentage] = percentage;
         return success;
     }
 
     if (adjustPercentageCallback && request.action == FSTR_PERCENTAGE_adjustPercentage) {
         int percentage                                     = request.request_value[FSTR_PERCENTAGE_percentage];
-        success                                            = adjustPercentageCallback(device->deviceId, percentage);
+        success                                            = adjustPercentageCallback(getDevice().deviceId, percentage);
         request.response_value[FSTR_PERCENTAGE_percentage] = percentage;
         return success;
     }
     return success;
+}
+
+template <typename T>
+T &PercentageController<T>::getDevice() {
+    return static_cast<T &>(*this);
+}
+
+template <typename T>
+const T &PercentageController<T>::getDevice() const {
+    return static_cast<const T &>(*this);
 }
 
 }  // namespace SINRICPRO_NAMESPACE

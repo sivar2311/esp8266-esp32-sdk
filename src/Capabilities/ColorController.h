@@ -45,6 +45,8 @@ class ColorController : public SinricProRequestHandler {
 
   private:
     virtual bool handleRequest(SinricProRequest &request);
+    inline T       &getDevice();
+    inline const T &getDevice() const;
 
   private:
     EventLimiter  event_limiter;
@@ -54,8 +56,7 @@ class ColorController : public SinricProRequestHandler {
 template <typename T>
 ColorController<T>::ColorController()
     : event_limiter(EVENT_LIMIT_STATE) {
-    T *device = static_cast<T *>(this);
-    device->registerRequestHandler(this);
+    getDevice().registerRequestHandler(this);
 }
 
 /**
@@ -84,20 +85,17 @@ void ColorController<T>::onColor(ColorCallback cb) {
 template <typename T>
 bool ColorController<T>::sendColorEvent(byte r, byte g, byte b, String cause) {
     if (event_limiter) return false;
-    T *device = static_cast<T *>(this);
 
-    DynamicJsonDocument eventMessage = device->prepareEvent(FSTR_COLOR_setColor, cause.c_str());
+    DynamicJsonDocument eventMessage = getDevice().prepareEvent(FSTR_COLOR_setColor, cause.c_str());
     JsonObject          event_color  = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value].createNestedObject(FSTR_COLOR_color);
     event_color[FSTR_COLOR_r]        = r;
     event_color[FSTR_COLOR_g]        = g;
     event_color[FSTR_COLOR_b]        = b;
-    return device->sendEvent(eventMessage);
+    return getDevice().sendEvent(eventMessage);
 }
 
 template <typename T>
 bool ColorController<T>::handleRequest(SinricProRequest &request) {
-    T *device = static_cast<T *>(this);
-
     bool success = false;
 
     if (colorCallback && request.action == FSTR_COLOR_setColor) {
@@ -105,7 +103,7 @@ bool ColorController<T>::handleRequest(SinricProRequest &request) {
         r       = request.request_value[FSTR_COLOR_color][FSTR_COLOR_r];
         g       = request.request_value[FSTR_COLOR_color][FSTR_COLOR_g];
         b       = request.request_value[FSTR_COLOR_color][FSTR_COLOR_b];
-        success = colorCallback(device->deviceId, r, g, b);
+        success = colorCallback(getDevice().deviceId, r, g, b);
         request.response_value.createNestedObject(FSTR_COLOR_color);
         request.response_value[FSTR_COLOR_color][FSTR_COLOR_r] = r;
         request.response_value[FSTR_COLOR_color][FSTR_COLOR_g] = g;
@@ -113,6 +111,16 @@ bool ColorController<T>::handleRequest(SinricProRequest &request) {
     }
 
     return success;
+}
+
+template <typename T>
+T& ColorController<T>::getDevice() {
+    return static_cast<T&>(*this);
+}
+
+template <typename T>
+const T& ColorController<T>::getDevice() const {
+    return static_cast<const T&>(*this);
 }
 
 }  // namespace SINRICPRO_NAMESPACE
