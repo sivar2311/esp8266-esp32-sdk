@@ -1,15 +1,15 @@
 #pragma once
 
+#include <Arduino.h>
+#include <ArduinoJson.h>
+
 #include "../EventLimiter.h"
 #include "../SinricProStrings.h"
 
 #include "../SinricProNamespace.h"
 namespace SINRICPRO_NAMESPACE {
 
-FSTR(AIRQUALITY, airQuality);  // "airQuality"
-FSTR(AIRQUALITY, pm1);         // "pm1"
-FSTR(AIRQUALITY, pm2_5);       // "pm2_5"
-FSTR(AIRQUALITY, pm10);        // "pm10"
+
 
 /**
  * @brief AirQuality

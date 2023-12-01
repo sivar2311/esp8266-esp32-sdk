@@ -1,14 +1,13 @@
 #pragma once
 
+#include <Arduino.h>
+#include <ArduinoJson.h>
+
 #include "../EventLimiter.h"
 #include "../SinricProStrings.h"
 
 #include "../SinricProNamespace.h"
 namespace SINRICPRO_NAMESPACE {
-
-FSTR(DOORBELL, DoorbellPress);    // "DoorbellPress"
-FSTR(DOORBELL, state);            // "state"
-FSTR(DOORBELL, pressed);          // "pressed"
 
 /**
  * @brief Dorbell

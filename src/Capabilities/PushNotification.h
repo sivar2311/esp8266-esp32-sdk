@@ -1,13 +1,12 @@
 #pragma once
 
+#include <Arduino.h>
+#include <ArduinoJson.h>
+
 #include "../EventLimiter.h"
-#include "../SinricProStrings.h"
-
 #include "../SinricProNamespace.h"
+#include "../SinricProStrings.h"
 namespace SINRICPRO_NAMESPACE {
-
-FSTR(PUSHNOTIFICATION, pushNotification);  // "pushNotification"
-FSTR(PUSHNOTIFICATION, alert);             // "alert"
 
 /**
  * @brief PushNotification
@@ -18,17 +17,18 @@ class PushNotification {
   public:
     PushNotification();
     bool sendPushNotification(String notification);
+
   private:
     EventLimiter event_limiter;
 };
 
 template <typename T>
 PushNotification<T>::PushNotification()
-: event_limiter (EVENT_LIMIT_SENSOR_VALUE) {}
+    : event_limiter(EVENT_LIMIT_SENSOR_VALUE) {}
 
 /**
  * @brief Sending push notifications to SinricPro App
- * 
+ *
  * @param   notification `String` with the notification
  * @return  the success of sending the event
  * @retval  true          event has been sent successfully
@@ -36,18 +36,18 @@ PushNotification<T>::PushNotification()
  **/
 template <typename T>
 bool PushNotification<T>::sendPushNotification(String notification) {
-  if (event_limiter) return false;
-  T* device = static_cast<T*>(this);
-  
-  DynamicJsonDocument eventMessage = device->prepareEvent(FSTR_PUSHNOTIFICATION_pushNotification, FSTR_SINRICPRO_ALERT);
-  JsonObject event_value = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
+    if (event_limiter) return false;
+    T* device = static_cast<T*>(this);
 
-  event_value[FSTR_PUSHNOTIFICATION_alert] = notification;
+    DynamicJsonDocument eventMessage = device->prepareEvent(FSTR_PUSHNOTIFICATION_pushNotification, FSTR_SINRICPRO_ALERT);
+    JsonObject          event_value  = eventMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
 
-  return device->sendEvent(eventMessage);
+    event_value[FSTR_PUSHNOTIFICATION_alert] = notification;
+
+    return device->sendEvent(eventMessage);
 }
 
-} // SINRICPRO_NAMESPACE
+}  // namespace SINRICPRO_NAMESPACE
 
 template <typename T>
 using PushNotification = SINRICPRO_NAMESPACE::PushNotification<T>;
