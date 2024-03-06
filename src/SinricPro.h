@@ -72,13 +72,15 @@ class SinricProClass : public SinricProInterface {
 
     JsonDocument prepareResponse(JsonDocument& requestMessage);
     JsonDocument prepareEvent(String deviceId, const char* action, const char* cause) override;
-    void                sendMessage(JsonDocument& jsonMessage) override;
+    void         sendMessage(JsonDocument& jsonMessage) override;
 
   private:
     void handleReceiveQueue();
     void handleSendQueue();
 
     void handleRequest(JsonDocument& requestMessage, interface_t Interface);
+    void handleDeviceRequest(JsonDocument& requestMessage, interface_t Interface);
+    void handleModuleRequest(JsonDocument& requestMessage, interface_t Interface);
     void handleResponse(JsonDocument& responseMessage);
 
     JsonDocument prepareRequest(String deviceId, const char* action);
@@ -253,7 +255,7 @@ void SinricProClass::handle() {
 
 JsonDocument SinricProClass::prepareRequest(String deviceId, const char* action) {
     JsonDocument requestMessage;
-    JsonObject          header              = requestMessage[FSTR_SINRICPRO_header].to<JsonObject>();
+    JsonObject   header                     = requestMessage[FSTR_SINRICPRO_header].to<JsonObject>();
     header[FSTR_SINRICPRO_payloadVersion]   = 2;
     header[FSTR_SINRICPRO_signatureVersion] = 1;
 
@@ -279,19 +281,32 @@ void SinricProClass::handleResponse(JsonDocument& responseMessage) {
 
 void SinricProClass::handleRequest(JsonDocument& requestMessage, interface_t Interface) {
     DEBUG_SINRIC("[SinricPro.handleRequest()]: handling request\r\n");
-#ifndef NODEBUG_SINRIC
-    serializeJsonPretty(requestMessage, DEBUG_ESP_PORT);
-#endif
 
+    JsonObject payload = requestMessage["payload"];
+    String     scope   = payload["scope"] | "device";
+
+    bool isDeviceScope = payload["deviceId"] != "";
+    bool isModuleScope = scope == "module";
+
+    Serial.printf("scope: %s\r\n", isModuleScope ? "module" : "device");
+
+    if (isModuleScope) handleModuleRequest(requestMessage, Interface);
+    if (isDeviceScope) handleDeviceRequest(requestMessage, Interface);
+}
+
+void SinricProClass::handleDeviceRequest(JsonDocument& requestMessage, interface_t Interface) {
+    DEBUG_SINRIC("[SinricPro.handleDeviceRequest()]: handling request\r\n");
     JsonDocument responseMessage = prepareResponse(requestMessage);
 
-    // handle devices
-    bool        success        = false;
-    const char* deviceId       = requestMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_deviceId];
-    String      action         = requestMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_action] | "";
-    String      instance       = requestMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_instanceId] | "";
-    JsonObject  request_value  = requestMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
-    JsonObject  response_value = responseMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_value];
+    bool        success       = false;
+    JsonObject  payload       = requestMessage["payload"];
+    const char* deviceId      = payload["deviceId"] | "";
+    String      action        = payload["action"] | "";
+    String      instance      = payload["instanceId"] | "";
+    JsonObject  request_value = payload["value"];
+    String      scope         = payload["scope"] | "device";
+
+    JsonObject response_value = payload["value"];
 
     for (auto& device : devices) {
         if (device->getDeviceId() == deviceId && success == false) {
@@ -300,14 +315,17 @@ void SinricProClass::handleRequest(JsonDocument& requestMessage, interface_t Int
                 instance,
                 request_value,
                 response_value};
-            success                                                         = device->handleRequest(request);
-            responseMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_success] = success;
+
+            success = device->handleRequest(request);
+
+            responseMessage["payload"]["success"] = success;
+
             if (!success) {
                 if (responseMessageStr.length() > 0) {
-                    responseMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_message] = responseMessageStr;
-                    responseMessageStr                                              = "";
+                    responseMessage["payload"]["message"] = responseMessageStr;
+                    responseMessageStr                    = "";
                 } else {
-                    responseMessage[FSTR_SINRICPRO_payload][FSTR_SINRICPRO_message] = "Device did not handle \"" + action + "\"";
+                    responseMessage["payload"]["message"] = "Device did not handle \"" + action + "\"";
                 }
             }
         }
@@ -316,6 +334,13 @@ void SinricProClass::handleRequest(JsonDocument& requestMessage, interface_t Int
     String responseString;
     serializeJson(responseMessage, responseString);
     sendQueue.push(new SinricProMessage(Interface, responseString.c_str()));
+}
+
+void SinricProClass::handleModuleRequest(JsonDocument& requestMessage, interface_t Interface) {
+    DEBUG_SINRIC("[SinricPro.handleModuleRequest()]: handling request\r\n");
+#ifndef NODEBUG_SINRIC
+    serializeJsonPretty(requestMessage, DEBUG_ESP_PORT);
+#endif
 }
 
 void SinricProClass::handleReceiveQueue() {
@@ -347,7 +372,10 @@ void SinricProClass::handleReceiveQueue() {
             if (messageType == FSTR_SINRICPRO_response) handleResponse(jsonMessage);
             if (messageType == FSTR_SINRICPRO_request) handleRequest(jsonMessage, rawMessage->getInterface());
         } else {
-            DEBUG_SINRIC("[SinricPro.handleReceiveQueue()]: Signature is invalid! Sending messsage to [dev/null] ;)\r\n");
+            // DEBUG_SINRIC("[SinricPro.handleReceiveQueue()]: Signature is invalid! Sending messsage to [dev/null] ;)\r\n");
+            DEBUG_SINRIC("[SinricPro.handleReceiveQueue()]: Signature is invalid! \r\n");
+            // serializeJsonPretty(jsonMessage, Serial); Serial.println();
+            if (messageType == FSTR_SINRICPRO_request) handleRequest(jsonMessage, rawMessage->getInterface());
         }
         delete rawMessage;
     }
@@ -539,7 +567,7 @@ unsigned long SinricProClass::getTimestamp() {
 
 JsonDocument SinricProClass::prepareResponse(JsonDocument& requestMessage) {
     JsonDocument responseMessage;
-    JsonObject          header              = responseMessage[FSTR_SINRICPRO_header].to<JsonObject>();
+    JsonObject   header                     = responseMessage[FSTR_SINRICPRO_header].to<JsonObject>();
     header[FSTR_SINRICPRO_payloadVersion]   = 2;
     header[FSTR_SINRICPRO_signatureVersion] = 1;
 
@@ -559,7 +587,7 @@ JsonDocument SinricProClass::prepareResponse(JsonDocument& requestMessage) {
 
 JsonDocument SinricProClass::prepareEvent(String deviceId, const char* action, const char* cause) {
     JsonDocument eventMessage;
-    JsonObject          header              = eventMessage[FSTR_SINRICPRO_header].to<JsonObject>();
+    JsonObject   header                     = eventMessage[FSTR_SINRICPRO_header].to<JsonObject>();
     header[FSTR_SINRICPRO_payloadVersion]   = 2;
     header[FSTR_SINRICPRO_signatureVersion] = 1;
 
